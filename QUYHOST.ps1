@@ -102,9 +102,9 @@ param(
     [string]$GPUName = "AUTO"
 )
 
-Write-Host "[INFO] Preparing GPU driver copy to $TargetRoot"
+Write-Host "INFO   : Copying GPU driver files to $TargetRoot (HOST ONLY)"
 
-# Detect GPU automatically if requested
+# Detect GPU
 if ($GPUName -eq "AUTO") {
     $PartitionableGPUList = Get-WmiObject -Class "Msvm_PartitionableGpu" -Namespace "ROOT\virtualization\v2"
     $DevicePathName = $PartitionableGPUList.Name | Select-Object -First 1
@@ -123,14 +123,14 @@ else {
     $GPUServiceName = $GPU.Service
 }
 
-Write-Host "[INFO] GPU detected: $GPUName"
-Write-Host "[INFO] GPU service: $GPUServiceName"
+Write-Host "INFO   : GPU detected: $GPUName"
+Write-Host "INFO   : GPU service : $GPUServiceName"
 
 # Prepare folders
 New-Item -ItemType Directory -Path "$TargetRoot\Windows\System32\HostDriverStore" -Force | Out-Null
 New-Item -ItemType Directory -Path "$TargetRoot\Windows\System32\drivers" -Force | Out-Null
 
-# Get NVIDIA system driver folder
+# Copy service driver directory
 $servicePath = (Get-WmiObject Win32_SystemDriver | Where-Object {$_.Name -eq $GPUServiceName}).Pathname
 $ServiceDriverDir = $servicePath.Split('\')[0..5] -join('\')
 $ServiceDriverDest = Join-Path $TargetRoot ($servicePath.Split('\')[1..5] -join('\'))
@@ -144,6 +144,7 @@ if (!(Test-Path $ServiceDriverDest)) {
 $Drivers = Get-WmiObject Win32_PNPSignedDriver | Where-Object { $_.DeviceName -eq $GPUName }
 
 foreach ($d in $Drivers) {
+
     $ModifiedDeviceID = $d.DeviceID -replace "\\", "\\"
     $Antecedent = "\\" + $hostname + "\ROOT\cimv2:Win32_PNPSignedDriver.DeviceID=""$ModifiedDeviceID"""
 
@@ -176,14 +177,14 @@ foreach ($d in $Drivers) {
     }
 }
 
-Write-Host "[SUCCESS] GPU driver copied to $TargetRoot"
+Write-Host "SUCCESS: GPU driver copied to $TargetRoot"
 }
-Write-Host "[STEP] Copy GPU driver to C:\DRIVER_GPU_COPY"
+
+Write-Host "[SUCCESS] GPU driver copied to $TargetRoot"
+
 Add-VMGpuPartitionAdapterFiles -GPUName "AUTO"
 
-Invoke-Command -VMName $vm -ScriptBlock {
-    Start-Process explorer.exe "C:\DRIVER_GPU_COPY"
-}
+Start-Process explorer.exe "C:\DRIVER_GPU_COPY"
 
 
 Write-Host ""
