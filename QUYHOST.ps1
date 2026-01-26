@@ -95,56 +95,48 @@ Where-Object { -not($_.Enabled) } |
 Enable-VMIntegrationService | Out-Null
 
 # ===== STEP 8: COPY NVIDIA DRIVER =====
-Function Add-VMGpuPartitionAdapterFiles {
-param(
-    [string]$hostname = $ENV:COMPUTERNAME,
-    [string]$TargetRoot = "C:\DRIVER_GPU_COPY",
-    [string]$GPUName = "AUTO"
-)
+$TargetRoot = "C:\DRIVER_GPU_COPY"
+$hostname = $ENV:COMPUTERNAME
 
-Write-Host "INFO   : Copying GPU driver files to $TargetRoot (HOST ONLY)"
+Write-Host "[INFO] Detecting GPU via PartitionableGpu..."
 
-# Detect GPU
-if ($GPUName -eq "AUTO") {
-    $PartitionableGPUList = Get-WmiObject -Class "Msvm_PartitionableGpu" -Namespace "ROOT\virtualization\v2"
-    $DevicePathName = $PartitionableGPUList.Name | Select-Object -First 1
-    $GPU = Get-PnpDevice | Where-Object {
-        ($_.DeviceID -like "*$($DevicePathName.Substring(8,16))*") -and ($_.Status -eq "OK")
-    } | Select-Object -First 1
+# ===== DETECT GPU =====
+$PartitionableGPUList = Get-WmiObject -Class "Msvm_PartitionableGpu" -Namespace "ROOT\virtualization\v2"
+$DevicePathName = $PartitionableGPUList.Name | Select-Object -First 1
 
-    $GPUName = $GPU.FriendlyName
-    $GPUServiceName = $GPU.Service
-}
-else {
-    $GPU = Get-PnpDevice | Where-Object {
-        ($_.Name -eq $GPUName) -and ($_.Status -eq "OK")
-    } | Select-Object -First 1
+$GPU = Get-PnpDevice | Where-Object {
+    ($_.DeviceID -like "*$($DevicePathName.Substring(8,16))*") -and ($_.Status -eq "OK")
+} | Select-Object -First 1
 
-    $GPUServiceName = $GPU.Service
+if (-not $GPU) {
+    Write-Host "[ERROR] Cannot detect GPU" -ForegroundColor Red
+    exit
 }
 
-Write-Host "INFO   : GPU detected: $GPUName"
-Write-Host "INFO   : GPU service : $GPUServiceName"
+$GPUName = $GPU.FriendlyName
+$GPUServiceName = $GPU.Service
 
-# Prepare folders
-New-Item -ItemType Directory -Path "$TargetRoot\Windows\System32\HostDriverStore" -Force | Out-Null
-New-Item -ItemType Directory -Path "$TargetRoot\Windows\System32\drivers" -Force | Out-Null
+Write-Host "INFO : GPU detected : $GPUName"
+Write-Host "INFO : GPU service  : $GPUServiceName"
 
-# Copy service driver directory
-$servicePath = (Get-WmiObject Win32_SystemDriver | Where-Object {$_.Name -eq $GPUServiceName}).Pathname
-$ServiceDriverDir = $servicePath.Split('\')[0..5] -join('\')
-$ServiceDriverDest = Join-Path $TargetRoot ($servicePath.Split('\')[1..5] -join('\'))
-$ServiceDriverDest = $ServiceDriverDest.Replace("DriverStore","HostDriverStore")
-
-if (!(Test-Path $ServiceDriverDest)) {
-    Copy-Item -Path $ServiceDriverDir -Destination $ServiceDriverDest -Recurse
+# ===== PREPARE TARGET =====
+if (!(Test-Path $TargetRoot)) {
+    New-Item -ItemType Directory -Path $TargetRoot | Out-Null
 }
 
-# Get signed drivers
-$Drivers = Get-WmiObject Win32_PNPSignedDriver | Where-Object { $_.DeviceName -eq $GPUName }
+# ===== GET SIGNED DRIVER =====
+$Drivers = Get-WmiObject Win32_PNPSignedDriver |
+    Where-Object { $_.DeviceName -eq $GPUName }
+
+if (-not $Drivers) {
+    Write-Host "[ERROR] No signed driver found for GPU" -ForegroundColor Red
+    exit
+}
+
+# ===== FIND DRIVERSTORE INF FOLDER (FIRST HIT) =====
+$InfFolder = $null
 
 foreach ($d in $Drivers) {
-
     $ModifiedDeviceID = $d.DeviceID -replace "\\", "\\"
     $Antecedent = "\\" + $hostname + "\ROOT\cimv2:Win32_PNPSignedDriver.DeviceID=""$ModifiedDeviceID"""
 
@@ -155,34 +147,57 @@ foreach ($d in $Drivers) {
         $path = $i.Dependent.Split("=")[1] -replace '\\\\','\'
         $path2 = $path.Substring(1,$path.Length-2)
 
-        if ($path2 -like "c:\windows\system32\driverstore\*") {
-            $DriverDir = $path2.Split('\')[0..5] -join('\')
-            $DriverDest = Join-Path $TargetRoot ($path2.Split('\')[1..5] -join('\'))
-            $DriverDest = $DriverDest.Replace("driverstore","HostDriverStore")
-
-            if (!(Test-Path $DriverDest)) {
-                Copy-Item -Path $DriverDir -Destination $DriverDest -Recurse
-            }
-        }
-        else {
-            $Dest = Join-Path $TargetRoot ($path2.Substring(3))
-            $DestDir = Split-Path $Dest
-
-            if (!(Test-Path $DestDir)) {
-                New-Item -ItemType Directory -Path $DestDir -Force | Out-Null
-            }
-
-            Copy-Item $path2 -Destination $Dest -Force
+        if ($path2 -like "c:\windows\system32\driverstore\filerepository\*") {
+            $InfFolder = ($path2.Split('\')[0..5] -join('\'))
+            break
         }
     }
+
+    if ($InfFolder) { break }
 }
 
-Write-Host "SUCCESS: GPU driver copied to $TargetRoot"
+if (-not $InfFolder) {
+    Write-Host "[ERROR] Cannot locate INF folder" -ForegroundColor Red
+    exit
 }
 
-Write-Host "[SUCCESS] GPU driver copied to $TargetRoot"
+$InfFolderName = Split-Path $InfFolder -Leaf
+Write-Host "[OK] INF folder detected: $InfFolderName"
 
-Add-VMGpuPartitionAdapterFiles -GPUName "AUTO"
+# ===== COPY INF FOLDER =====
+$DestInf = Join-Path $TargetRoot $InfFolderName
+if (!(Test-Path $DestInf)) {
+    Copy-Item -Path $InfFolder -Destination $DestInf -Recurse
+}
+
+# ===== COPY REQUIRED DLL (nvapi64.dll example) =====
+# NOTE: lấy DLL từ DriverFiles cho đúng GPU, không hardcode
+foreach ($d in $Drivers) {
+    $ModifiedDeviceID = $d.DeviceID -replace "\\", "\\"
+    $Antecedent = "\\" + $hostname + "\ROOT\cimv2:Win32_PNPSignedDriver.DeviceID=""$ModifiedDeviceID"""
+
+    Get-WmiObject Win32_PNPSignedDriverCIMDataFile |
+        Where-Object { $_.Antecedent -eq $Antecedent } |
+        ForEach-Object {
+            $path = $_.Dependent.Split("=")[1] -replace '\\\\','\'
+            $path2 = $path.Substring(1,$path.Length-2)
+
+            if ($path2 -match "nvapi64\.dll$") {
+                Copy-Item $path2 -Destination $TargetRoot -Force
+                Write-Host "[OK] Copied nvapi64.dll"
+            }
+        }
+}
+
+# ===== DONE =====
+Write-Host ""
+Write-Host "==============================="
+Write-Host "[SUCCESS] GPU DRIVER READY" -ForegroundColor Green
+Write-Host "==============================="
+Write-Host "Path: $TargetRoot"
+
+Start-Process explorer.exe $TargetRoot
+
 
 Start-Process explorer.exe "C:\DRIVER_GPU_COPY"
 
