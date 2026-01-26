@@ -24,7 +24,7 @@ switch ($choice) {
         # ===============================
         $userScript = "C:\QUYUSER.ps1"
 
-        Write-Host "[VM] Downloading QUYVM_USER.ps1 -> $userScript"
+        Write-Host "[VM] Downloading QUYUSER.ps1 -> $userScript"
 
         iwr -UseBasicParsing `
           https://raw.githubusercontent.com/IoT-VN/Hyper-V/refs/heads/main/QUYUSER.ps1 `
@@ -73,4 +73,5 @@ Write-Host "==============================="
 Write-Host "            DONE               "
 
 Write-Host "==============================="
+
 
