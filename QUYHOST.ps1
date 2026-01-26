@@ -95,36 +95,96 @@ Where-Object { -not($_.Enabled) } |
 Enable-VMIntegrationService | Out-Null
 
 # ===== STEP 8: COPY NVIDIA DRIVER =====
-$systemPath = "C:\Windows\System32\"
-$driverPath = "C:\Windows\System32\DriverStore\FileRepository\"
+Function Add-VMGpuPartitionAdapterFiles {
+param(
+    [string]$hostname = $ENV:COMPUTERNAME,
+    [string]$TargetRoot = "C:\DRIVER_GPU_COPY",
+    [string]$GPUName = "AUTO"
+)
 
-$localDriverFolder = ""
-Get-ChildItem $driverPath -Recurse |
-Where-Object { $_.PSIsContainer -and $_.Name -match "nv_dispi.inf_amd64_.*" } |
-Sort-Object LastWriteTime -Descending |
-Select-Object -First 1 |
-ForEach-Object { $localDriverFolder = $_.Name }
+Write-Host "[INFO] Preparing GPU driver copy to $TargetRoot"
 
-Write-Host "[INFO] Using driver folder: $localDriverFolder"
+# Detect GPU automatically if requested
+if ($GPUName -eq "AUTO") {
+    $PartitionableGPUList = Get-WmiObject -Class "Msvm_PartitionableGpu" -Namespace "ROOT\virtualization\v2"
+    $DevicePathName = $PartitionableGPUList.Name | Select-Object -First 1
+    $GPU = Get-PnpDevice | Where-Object {
+        ($_.DeviceID -like "*$($DevicePathName.Substring(8,16))*") -and ($_.Status -eq "OK")
+    } | Select-Object -First 1
 
-Get-ChildItem ($driverPath + $localDriverFolder) -Recurse |
-Where-Object { -not $_.PSIsContainer } |
-ForEach-Object {
-    $dst = $_.FullName -replace "^C\:\\Windows\\System32\\DriverStore\\", "C:\Temp\System32\HostDriverStore\"
-    Copy-VMFile $vm $_.FullName $dst -Force -CreateFullPath -FileSource Host
+    $GPUName = $GPU.FriendlyName
+    $GPUServiceName = $GPU.Service
+}
+else {
+    $GPU = Get-PnpDevice | Where-Object {
+        ($_.Name -eq $GPUName) -and ($_.Status -eq "OK")
+    } | Select-Object -First 1
+
+    $GPUServiceName = $GPU.Service
 }
 
-Get-ChildItem $systemPath | Where-Object { $_.Name -like "NV*" } |
-ForEach-Object {
-    $dst = $_.FullName -replace "^C\:\\Windows\\System32\\", "C:\Temp\System32\"
-    Copy-VMFile $vm $_.FullName $dst -Force -CreateFullPath -FileSource Host
+Write-Host "[INFO] GPU detected: $GPUName"
+Write-Host "[INFO] GPU service: $GPUServiceName"
+
+# Prepare folders
+New-Item -ItemType Directory -Path "$TargetRoot\Windows\System32\HostDriverStore" -Force | Out-Null
+New-Item -ItemType Directory -Path "$TargetRoot\Windows\System32\drivers" -Force | Out-Null
+
+# Get NVIDIA system driver folder
+$servicePath = (Get-WmiObject Win32_SystemDriver | Where-Object {$_.Name -eq $GPUServiceName}).Pathname
+$ServiceDriverDir = $servicePath.Split('\')[0..5] -join('\')
+$ServiceDriverDest = Join-Path $TargetRoot ($servicePath.Split('\')[1..5] -join('\'))
+$ServiceDriverDest = $ServiceDriverDest.Replace("DriverStore","HostDriverStore")
+
+if (!(Test-Path $ServiceDriverDest)) {
+    Copy-Item -Path $ServiceDriverDir -Destination $ServiceDriverDest -Recurse
 }
 
-Write-Host "[OK] Driver copied to C:\Temp"
+# Get signed drivers
+$Drivers = Get-WmiObject Win32_PNPSignedDriver | Where-Object { $_.DeviceName -eq $GPUName }
 
-# ===== STEP 9: OPEN FOLDER IN VM =====
-Write-Host "[STEP] Opening C:\Temp"
-Start-Process explorer.exe "C:\Temp"
+foreach ($d in $Drivers) {
+    $ModifiedDeviceID = $d.DeviceID -replace "\\", "\\"
+    $Antecedent = "\\" + $hostname + "\ROOT\cimv2:Win32_PNPSignedDriver.DeviceID=""$ModifiedDeviceID"""
+
+    $DriverFiles = Get-WmiObject Win32_PNPSignedDriverCIMDataFile |
+        Where-Object { $_.Antecedent -eq $Antecedent }
+
+    foreach ($i in $DriverFiles) {
+        $path = $i.Dependent.Split("=")[1] -replace '\\\\','\'
+        $path2 = $path.Substring(1,$path.Length-2)
+
+        if ($path2 -like "c:\windows\system32\driverstore\*") {
+            $DriverDir = $path2.Split('\')[0..5] -join('\')
+            $DriverDest = Join-Path $TargetRoot ($path2.Split('\')[1..5] -join('\'))
+            $DriverDest = $DriverDest.Replace("driverstore","HostDriverStore")
+
+            if (!(Test-Path $DriverDest)) {
+                Copy-Item -Path $DriverDir -Destination $DriverDest -Recurse
+            }
+        }
+        else {
+            $Dest = Join-Path $TargetRoot ($path2.Substring(3))
+            $DestDir = Split-Path $Dest
+
+            if (!(Test-Path $DestDir)) {
+                New-Item -ItemType Directory -Path $DestDir -Force | Out-Null
+            }
+
+            Copy-Item $path2 -Destination $Dest -Force
+        }
+    }
+}
+
+Write-Host "[SUCCESS] GPU driver copied to $TargetRoot"
+}
+Write-Host "[STEP] Copy GPU driver to C:\DRIVER_GPU_COPY"
+Add-VMGpuPartitionAdapterFiles -GPUName "AUTO"
+
+Invoke-Command -VMName $vm -ScriptBlock {
+    Start-Process explorer.exe "C:\DRIVER_GPU_COPY"
+}
+
 
 Write-Host ""
 Write-Host "==============================="
