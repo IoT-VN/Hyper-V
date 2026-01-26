@@ -79,8 +79,19 @@ try {
 } catch {
     Write-Host "[WARN] Scheduled Task not found"
 }
+# ===============================
+# STEP 6: SELF DELETE SCRIPT
+# ===============================
+$scriptPath = $MyInvocation.MyCommand.Path
+
+Write-Host "[STEP] Self delete script: $scriptPath"
+
+Start-Process powershell.exe `
+ -ArgumentList "-NoProfile -WindowStyle Hidden -Command `"Start-Sleep -Seconds 2; Remove-Item -Path '$scriptPath' -Force`"" `
+ -WindowStyle Hidden
 
 Write-Host ""
 Write-Host "==============================="
 Write-Host "[SUCCESS] USER INIT DONE"
 Write-Host "==============================="
+
