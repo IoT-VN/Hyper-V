@@ -3,7 +3,9 @@ Write-Host " Enable Share LAN (VM LOCAL)   "
 Write-Host "==============================="
 Write-Host ""
 
-# STEP 0: Check admin
+# ===============================
+# STEP 0: CHECK ADMIN
+# ===============================
 Write-Host "[STEP 0] Check Administrator rights"
 if (-not ([Security.Principal.WindowsPrincipal] `
     [Security.Principal.WindowsIdentity]::GetCurrent()
@@ -13,105 +15,131 @@ if (-not ([Security.Principal.WindowsPrincipal] `
     exit
 }
 Write-Host "MM2512-[OK] Running as Administrator"
-
 Write-Host ""
 
-# STEP 1: Ask user for share path
+# ===============================
+# STEP 1: ASK SHARE
+# ===============================
 $share = Read-Host "MM2512-Nhap UNC share (VD: \\192.168.88.10)"
-
 if (-not $share.StartsWith("\\")) {
     Write-Host "MM2512-[ERROR] Share path phai bat dau bang \\\\" -ForegroundColor Red
     pause
     exit
 }
-
 Write-Host "MM2512-[INFO] Share path: $share"
-
 Write-Host ""
-Write-Host "MM2512-[STEP 2] Enable insecure guest logons (Lanman Workstation)"
 
-try {
-    New-Item -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\LanmanWorkstation" -Force | Out-Null
-    Set-ItemProperty `
-      -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\LanmanWorkstation" `
-      -Name "AllowInsecureGuestAuth" `
-      -Type DWord `
-      -Value 1
+# ===============================
+# STEP 2: ENABLE INSECURE GUEST
+# ===============================
+Write-Host "MM2512-[STEP 2] Enable insecure guest logons"
 
-    Write-Host "MM2512-[OK] Registry set"
-} catch {
-    Write-Host "MM2512-[ERROR] Failed to set registry" -ForegroundColor Red
-    Write-Host $_
-    pause
-    exit
-}
+New-Item -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\LanmanWorkstation" -Force | Out-Null
+Set-ItemProperty `
+  -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\LanmanWorkstation" `
+  -Name "AllowInsecureGuestAuth" `
+  -Type DWord `
+  -Value 1
 
+Write-Host "MM2512-[OK] Registry set"
 Write-Host ""
+
+# ===============================
+# STEP 3: APPLY POLICY
+# ===============================
 Write-Host "MM2512-[STEP 3] Apply policy"
 gpupdate /force
-
 Write-Host ""
-Write-Host "MM2512-[STEP 4] Restart LanmanWorkstation service"
-try {
-    Restart-Service LanmanWorkstation -Force
-    Write-Host "MM2512-[OK] Service restarted"
-} catch {
-    Write-Host "MM2512-[ERROR] Failed to restart service" -ForegroundColor Red
-    Write-Host $_
-    pause
-    exit
-}
 
+# ===============================
+# STEP 4: RESTART SERVICE
+# ===============================
+Write-Host "MM2512-[STEP 4] Restart LanmanWorkstation"
+Restart-Service LanmanWorkstation -Force
+Write-Host "MM2512-[OK] Service restarted"
 Write-Host ""
+
+# ===============================
+# STEP 5: OPEN SHARE
+# ===============================
 Write-Host "MM2512-[STEP 5] Open share path"
-try {
-    Start-Process explorer.exe $share
-    Write-Host "MM2512-[OK] Share opened: $share"
-} catch {
-    Write-Host "MM2512-[ERROR] Failed to open share" -ForegroundColor Red
-    Write-Host $_
-    pause
-    exit
+Start-Process explorer.exe $share
+Write-Host "MM2512-[OK] Share opened"
+Write-Host ""
+
+# ===============================
+# STEP 6: CREATE DRIVER SHORTCUT
+# ===============================
+Write-Host "MM2512-[STEP 6] Create DRIVER shortcuts"
+
+$desktop = [Environment]::GetFolderPath("Desktop")
+$driverDir = Join-Path $desktop "DRIVER"
+if (-not (Test-Path $driverDir)) {
+    New-Item -ItemType Directory -Path $driverDir | Out-Null
 }
 
+$wsh = New-Object -ComObject WScript.Shell
+
+$sc1 = $wsh.CreateShortcut((Join-Path $driverDir "FileRepository.lnk"))
+$sc1.TargetPath = "C:\Windows\System32\DriverStore\FileRepository"
+$sc1.Save()
+
+$sc2 = $wsh.CreateShortcut((Join-Path $driverDir "System32.lnk"))
+$sc2.TargetPath = "C:\Windows\System32"
+$sc2.Save()
+
+Write-Host "MM2512-[OK] Shortcuts created"
 Write-Host ""
-Write-Host "MM2512-[STEP 6] Create DRIVER folder + shortcuts on Desktop"
 
-try {
-    $desktop = [Environment]::GetFolderPath("Desktop")
-    $driverDir = Join-Path $desktop "DRIVER"
+# ===============================
+# STEP 7: AUTO LOGIN SETUP
+# ===============================
+Write-Host "MM2512-[STEP 7] Setup Auto Login (Server 2022)"
 
-    if (-not (Test-Path $driverDir)) {
-        New-Item -ItemType Directory -Path $driverDir | Out-Null
-        Write-Host "MM2512-[OK] Created folder: $driverDir"
-    } else {
-        Write-Host "MM2512-[INFO] Folder DRIVER already exists"
-    }
+$User = "Administrator"
+$Pass = "123"   # có thể đổi nếu muốn
 
-    $wsh = New-Object -ComObject WScript.Shell
+# Disable password complexity
+secedit /export /cfg C:\secpol.cfg > $null
+(Get-Content C:\secpol.cfg).Replace(
+    "PasswordComplexity = 1",
+    "PasswordComplexity = 0"
+) | Set-Content C:\secpol.cfg
+secedit /configure /db secedit.sdb /cfg C:\secpol.cfg /areas SECURITYPOLICY
+Remove-Item C:\secpol.cfg -Force
 
-    # Shortcut 1: DriverStore\FileRepository
-    $sc1 = $wsh.CreateShortcut((Join-Path $driverDir "FileRepository.lnk"))
-    $sc1.TargetPath = "C:\Windows\System32\DriverStore\FileRepository"
-    $sc1.WorkingDirectory = "C:\Windows\System32\DriverStore"
-    $sc1.Save()
+# Set password
+net user $User $Pass
 
-    # Shortcut 2: System32
-    $sc2 = $wsh.CreateShortcut((Join-Path $driverDir "System32.lnk"))
-    $sc2.TargetPath = "C:\Windows\System32"
-    $sc2.WorkingDirectory = "C:\Windows"
-    $sc2.Save()
+# Password never expires
+wmic useraccount where name="$User" set PasswordExpires=FALSE
 
-    Write-Host "MM2512-[OK] Shortcuts created in DRIVER folder"
-} catch {
-    Write-Host "MM2512-[ERROR] Failed to create shortcuts" -ForegroundColor Red
-    Write-Host $_
-    pause
-    exit
-}
+# Auto logon registry
+$reg = "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon"
+Set-ItemProperty $reg AutoAdminLogon "1"
+Set-ItemProperty $reg DefaultUserName $User
+Set-ItemProperty $reg DefaultPassword $Pass
+Set-ItemProperty $reg DefaultDomainName $env:COMPUTERNAME
+
+# Disable Ctrl+Alt+Del
+Set-ItemProperty `
+ "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System" `
+ DisableCAD 1
+
+# Disable Lock Screen
+New-Item `
+ "HKLM:\SOFTWARE\Policies\Microsoft\Windows\Personalization" `
+ -Force | Out-Null
+
+Set-ItemProperty `
+ "HKLM:\SOFTWARE\Policies\Microsoft\Windows\Personalization" `
+ NoLockScreen 1
 
 Write-Host ""
-Write-Host "==============================="
-Write-Host "MM2512-[SUCCESS] DONE" -ForegroundColor Green
-Write-Host "==============================="
-pause
+Write-Host "MM2512-[SUCCESS] ALL CONFIG DONE"
+Write-Host "MM2512-[INFO] Rebooting VM now..."
+
+# ===============================
+# STEP 8: REBOOT IMMEDIATELY
+# ===============================
+Restart-Computer -Force
