@@ -22,7 +22,7 @@ switch ($choice) {
         # ===============================
         # STEP 2: DOWNLOAD QUYVM_USER.ps1
         # ===============================
-        $userScript = "C:\QUYVM_USER.ps1"
+        $userScript = "C:\QUYUSER.ps1"
 
         Write-Host "[VM] Downloading QUYVM_USER.ps1 -> $userScript"
 
@@ -73,3 +73,4 @@ Write-Host "==============================="
 Write-Host "            DONE               "
 
 Write-Host "==============================="
+
