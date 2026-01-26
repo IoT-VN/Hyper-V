@@ -54,12 +54,8 @@ Write-Host ""
 # ===============================
 Write-Host "[STEP] Create MAY_SHARE shortcut"
 
-$shareDir = Join-Path $desktop "MAY_SHARE"
-if (-not (Test-Path $shareDir)) {
-    New-Item -ItemType Directory -Path $shareDir | Out-Null
-}
-
-$scShare = $wsh.CreateShortcut((Join-Path $shareDir "MAY_SHARE.lnk"))
+$wsh2 = New-Object -ComObject WScript.Shell
+$scShare = $wsh2.CreateShortcut((Join-Path $desktop "MAY_SHARE.lnk"))
 $scShare.TargetPath = $share
 $scShare.Save()
 
@@ -94,4 +90,5 @@ Write-Host ""
 Write-Host "==============================="
 Write-Host "[SUCCESS] USER INIT DONE"
 Write-Host "==============================="
+
 
