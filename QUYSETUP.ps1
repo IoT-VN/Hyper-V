@@ -100,6 +100,7 @@ param(
 			Write-Host "Shortcut '$oldName' renamed to '$newName'."
 	}
 }
+RemoveShortcut -ShortcutName "copy your GPU driver folder here"
 RemoveShortcut -ShortcutName "browse host.lnk"
 RemoveShortcut -ShortcutName "soft.lnk"
 RemoveShortcut -ShortcutName "ExileAgent.lnk"
@@ -115,10 +116,6 @@ $desktopPath = 'HKCU:\Software\Microsoft\Windows\Shell\Bags\1\Desktop'
 # 1075839524: Auto Arrange OFF and Align to Grid ON
 #1075839525
 $autoArrangeOnValue = 1075839521
-Set-ItemProperty -Path $desktopPath -Name 'FFlags' -Value $autoArrangeOnValue
-Get-Process explorer | Stop-Process -Force
-Start-Sleep 2
-$autoArrangeOnValue = 1075839520
 Set-ItemProperty -Path $desktopPath -Name 'FFlags' -Value $autoArrangeOnValue
 Get-Process explorer | Stop-Process -Force
 
