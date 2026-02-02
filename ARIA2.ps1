@@ -72,9 +72,10 @@ Write-Host "[OK] C:\WIN is ready"
 
 
 & "$env:LOCALAPPDATA\Programs\Python\Python310\python.exe" -m gdown `
-  "https://drive.google.com/uc?export=download&id=15CnSmXmjwAWuSCZmn66i6EXb4Mq86voc" `
+  "https://drive.google.com/uc?id=15CnSmXmjwAWuSCZmn66i6EXb4Mq86voc" `
   -O C:\WIN\QUY.vhdx
 
 pause
+
 
 
