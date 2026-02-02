@@ -12,9 +12,9 @@ Write-Host "[OK] Running as Administrator"
 Write-Host ""
 
 # ===============================
-# STEP 1: INSTALL PYTHON 3.10
+# STEP 1: INSTALL PYTHON 3.10 (USER MODE)
 # ===============================
-Write-Host "[STEP] Installing Python 3.10..."
+Write-Host "[STEP] Installing Python 3.10 (per-user)..."
 
 $pythonUrl = "https://www.python.org/ftp/python/3.10.0/python-3.10.0-amd64.exe"
 $installer = "$env:TEMP\python310.exe"
@@ -22,27 +22,39 @@ $installer = "$env:TEMP\python310.exe"
 Invoke-WebRequest $pythonUrl -OutFile $installer
 
 Start-Process $installer -Wait -ArgumentList `
-    "/quiet InstallAllUsers=1 PrependPath=1 Include_pip=1"
+    "/quiet InstallAllUsers=0 PrependPath=0 Include_pip=1"
 
-Write-Host "[OK] Python installed"
+Write-Host "[OK] Python installed (user scope)"
 Write-Host ""
 
-# Reload PATH (machine + user)
-$env:Path = [Environment]::GetEnvironmentVariable("Path","Machine") + ";" +
-            [Environment]::GetEnvironmentVariable("Path","User")
+# ===============================
+# STEP 2: DETECT PYTHON PATH (AUTO)
+# ===============================
+$py = "$env:LOCALAPPDATA\Programs\Python\Python310\python.exe"
+
+if (Test-Path $py) {
+    Write-Host "[OK] Python binary found:"
+    Write-Host "     $py"
+} else {
+    Write-Host "[ERROR] Python NOT found at user path!" -ForegroundColor Red
+    pause
+    exit
+}
 
 # ===============================
-# STEP 2: VERIFY PYTHON & PIP
+# STEP 3: VERIFY PYTHON (NO PATH)
 # ===============================
-python --version
-pip --version
+& $py --version
 
 # ===============================
-# STEP 3: INSTALL gdown
+# STEP 4: INSTALL pip + gdown (SAFE WAY)
 # ===============================
-Write-Host "[STEP] Installing gdown..."
-pip install --upgrade gdown
+Write-Host "[STEP] Installing pip & gdown..."
+
+& $py -m ensurepip --upgrade
+& $py -m pip install --upgrade pip
+& $py -m pip install --upgrade gdown
 
 Write-Host ""
-Write-Host "[SUCCESS] Python + gdown ready"
+Write-Host "[SUCCESS] Python + gdown ready (user-safe)"
 pause
