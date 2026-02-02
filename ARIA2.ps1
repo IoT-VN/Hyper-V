@@ -31,7 +31,8 @@ if ($hv.State -ne "Enabled") {
         -NoRestart
 
     Write-Host "[INFO] Hyper-V enabled. System will reboot now..." -ForegroundColor Cyan
-    Start-Sleep -Seconds 3
+    Write-Host "[INFO] Hyper-V already enabled"
+    Start-Sleep -Seconds 5
     Restart-Computer -Force
     exit
 }
@@ -135,5 +136,6 @@ if ($needDownload) {
 Write-Host ""
 Write-Host "[SUCCESS] DONE"
 pause
+
 
 
