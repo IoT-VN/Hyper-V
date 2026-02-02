@@ -18,3 +18,4 @@ Expand-Archive -Path $zip -DestinationPath "C:\Tools\aria2" -Force
 $ariaPath = "C:\Tools\aria2\aria2-1.37.0-win-64bit-build1"
 [Environment]::SetEnvironmentVariable("Path", [Environment]::GetEnvironmentVariable("Path","Machine") + ";$ariaPath", "Machine")
 Write-Host "aria2 installed. Close & reopen PowerShell to use aria2c"
+exit
