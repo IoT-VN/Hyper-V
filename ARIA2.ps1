@@ -96,29 +96,43 @@ if (-not (Test-Path $winDir)) {
     New-Item -ItemType Directory -Path $winDir | Out-Null
     Write-Host "[OK] Created C:\WIN"
 }
+$hashExe = "$winDir\HASH.exe"
+$hashUrl = "https://github.com/IoT-VN/Hyper-V/raw/refs/heads/main/HASH.exe"
+
+if (-not (Test-Path $hashExe)) {
+    Write-Host "[STEP] Downloading HASH.exe..."
+    Invoke-WebRequest $hashUrl -OutFile $hashExe
+    Write-Host "[OK] HASH.exe downloaded"
+}
 
 # ===============================
-# STEP 4: CHECK EXISTING VHDX HASH
+# STEP 4: CHECK EXISTING VHDX HASH (HASH.exe)
 # ===============================
 $needDownload = $true
+$expectHash = "86716d7fe6ce1290806ca894e72cd006"
 
 if (Test-Path $vhdx) {
-    Write-Host "[INFO] QUY.vhdx exists, checking SHA256..."
+    Write-Host "[INFO] QUY.vhdx exists, checking HASH.exe..."
 
-    $currentHash = (certutil -hashfile $vhdx SHA256 |
-        Select-String -Pattern "^[0-9a-fA-F]{64}" |
-        ForEach-Object { $_.Line }).ToLower()
+    try {
+        $currentHash = (& $hashExe $vhdx).Trim().ToLower()
+        Write-Host "[INFO] Current HASH: $currentHash"
 
-    Write-Host "[INFO] Current SHA256: $currentHash"
-
-    if ($currentHash -eq $expectHash) {
-        Write-Host "[OK] SHA256 match. Skip download."
-        $needDownload = $false
-    } else {
-        Write-Host "[WARN] SHA256 mismatch. Will re-download."
+        if ($currentHash -eq $expectHash) {
+            Write-Host "[OK] Hash match. Skip download."
+            $needDownload = $false
+        }
+        else {
+            Write-Host "[WARN] Hash mismatch. Will re-download."
+            Remove-Item $vhdx -Force
+        }
+    }
+    catch {
+        Write-Host "[ERROR] HASH.exe failed, re-download required" -ForegroundColor Red
         Remove-Item $vhdx -Force
     }
 }
+
 
 # ===============================
 # STEP 5: DOWNLOAD IF NEEDED
@@ -136,6 +150,7 @@ if ($needDownload) {
 Write-Host ""
 Write-Host "[SUCCESS] DONE"
 pause
+
 
 
 
