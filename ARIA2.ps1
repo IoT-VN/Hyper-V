@@ -4,12 +4,27 @@
 if (-not ([Security.Principal.WindowsPrincipal] `
     [Security.Principal.WindowsIdentity]::GetCurrent()
 ).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
-    Write-Host "[ERROR] Please run PowerShell as Administrator" -ForegroundColor Red
-    pause
+
+    Write-Host "[ERROR] Script requires Administrator. Restarting..." -ForegroundColor Red
+
+    Start-Process powershell `
+        -ArgumentList "-ExecutionPolicy Bypass -File `"$PSCommandPath`"" `
+        -Verb RunAs
+
     exit
 }
+
 Write-Host "[OK] Running as Administrator"
 Write-Host ""
+
+
+$hv = Get-WindowsOptionalFeature -Online -FeatureName Microsoft-Hyper-V-All
+
+if ($hv.State -ne "Enabled") {
+    Write-Host "[INFO] Hyper-V not enabled"
+} else {
+    Write-Host "[OK] Hyper-V already enabled"
+}
 
 # ===============================
 # STEP 1: CHECK PYTHON 3.10 (USER MODE)
@@ -107,3 +122,4 @@ if ($needDownload) {
 Write-Host ""
 Write-Host "[SUCCESS] DONE"
 pause
+
