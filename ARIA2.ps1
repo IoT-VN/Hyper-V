@@ -23,6 +23,8 @@ $pythonPath = Join-Path $env:ProgramFiles "Python310"
 
 # Verify the installation
 python --version
+pip install --upgrade gdown
+pause
 
 
 
