@@ -8,14 +8,20 @@ if (-not ([Security.Principal.WindowsPrincipal] `
 }
 Write-Host "[OK] Running as Administrator"
 Write-Host ""
-Write-Host "[OK] Install aria2"
-New-Item -ItemType Directory -Path "C:\Tools\aria2" -Force | Out-Null
-$zip = "C:\Tools\aria2\aria2.zip"
-Invoke-WebRequest `
-  -Uri "https://github.com/aria2/aria2/releases/download/release-1.37.0/aria2-1.37.0-win-64bit-build1.zip" `
-  -OutFile $zip
-Expand-Archive -Path $zip -DestinationPath "C:\Tools\aria2" -Force
-$ariaPath = "C:\Tools\aria2\aria2-1.37.0-win-64bit-build1"
-[Environment]::SetEnvironmentVariable("Path", [Environment]::GetEnvironmentVariable("Path","Machine") + ";$ariaPath", "Machine")
-Write-Host "aria2 installed. Close & reopen PowerShell to use aria2c"
-exit
+Write-Host "[OK] Install pyhton"
+# Download the latest version of Python from the official website
+$pythonUrl = "https://www.python.org/ftp/python/3.10.0/python-3.10.0-amd64.exe"
+$pythonInstaller = "$($env:TEMP)\python.exe"
+Invoke-WebRequest -Uri $pythonUrl -OutFile $pythonInstaller
+
+# Install Python with default settings
+Start-Process -FilePath $pythonInstaller -ArgumentList "/quiet" -Wait
+
+# Add Python to the PATH environment variable
+$pythonPath = Join-Path $env:ProgramFiles "Python310"
+[System.Environment]::SetEnvironmentVariable("Path", "$($env:Path);$pythonPath", "User")
+
+# Verify the installation
+python --version
+
+
