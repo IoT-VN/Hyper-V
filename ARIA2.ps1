@@ -8,7 +8,7 @@ if (-not ([Security.Principal.WindowsPrincipal] `
 }
 Write-Host "[OK] Running as Administrator"
 Write-Host ""
-Write-Host "[OK] Install pyhton"
+Write-Host "[OK] Install python"
 # Download the latest version of Python from the official website
 $pythonUrl = "https://www.python.org/ftp/python/3.10.0/python-3.10.0-amd64.exe"
 $pythonInstaller = "$($env:TEMP)\python.exe"
@@ -23,5 +23,6 @@ $pythonPath = Join-Path $env:ProgramFiles "Python310"
 
 # Verify the installation
 python --version
+
 
 
