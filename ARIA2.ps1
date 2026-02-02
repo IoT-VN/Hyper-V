@@ -90,19 +90,17 @@ Write-Host ""
 # ===============================
 $winDir = "C:\WIN"
 $vhdx   = "$winDir\QUY.vhdx"
-$expectHash = "89f78895c638219c270fe6dfd87174eea7e901880d6596dd2fa8a84c357ca784"
-
 if (-not (Test-Path $winDir)) {
     New-Item -ItemType Directory -Path $winDir | Out-Null
     Write-Host "[OK] Created C:\WIN"
 }
-$hashExe = "$winDir\HASH.exe"
-$hashUrl = "https://github.com/IoT-VN/Hyper-V/raw/refs/heads/main/HASH.exe"
+$hashExe = "$winDir\xxh128sum.exe"
+$hashUrl = "https://github.com/IoT-VN/Hyper-V/raw/refs/heads/main/xxh128sum.exe"
 
 if (-not (Test-Path $hashExe)) {
-    Write-Host "[STEP] Downloading HASH.exe..."
+    Write-Host "[STEP] Downloading xxh128sum.exe..."
     Invoke-WebRequest $hashUrl -OutFile $hashExe
-    Write-Host "[OK] HASH.exe downloaded"
+    Write-Host "[OK] xxh128sum.exe downloaded"
 }
 
 # ===============================
@@ -112,7 +110,7 @@ $needDownload = $true
 $expectHash = "86716d7fe6ce1290806ca894e72cd006"
 
 if (Test-Path $vhdx) {
-    Write-Host "[INFO] QUY.vhdx exists, checking HASH.exe..."
+    Write-Host "[INFO] QUY.vhdx exists, checking xxh128sum.exe..."
 
     try {
         $currentHash = (& $hashExe $vhdx).Trim().ToLower()
@@ -150,6 +148,7 @@ if ($needDownload) {
 Write-Host ""
 Write-Host "[SUCCESS] DONE"
 pause
+
 
 
 
