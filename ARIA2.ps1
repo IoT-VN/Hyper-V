@@ -57,4 +57,23 @@ Write-Host "[STEP] Installing pip & gdown..."
 
 Write-Host ""
 Write-Host "[SUCCESS] Python + gdown ready (user-safe)"
+
+$winDir = "C:\WIN"
+
+if (Test-Path $winDir) {
+    Write-Host "[INFO] C:\WIN exists, cleaning contents..."
+    Get-ChildItem $winDir -Force | Remove-Item -Recurse -Force
+} else {
+    Write-Host "[INFO] C:\WIN not found, creating..."
+    New-Item -ItemType Directory -Path $winDir | Out-Null
+}
+
+Write-Host "[OK] C:\WIN is ready"
+
+
+& "$env:LOCALAPPDATA\Programs\Python\Python310\python.exe" -m gdown `
+  "https://drive.google.com/uc?id15CnSmXmjwAWuSCZmn66i6EXb4Mq86voc" `
+  -O C:\WIN\QUY.vhdx
+
 pause
+
