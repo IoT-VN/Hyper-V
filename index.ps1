@@ -36,7 +36,7 @@ switch ($choice) {
     }
     "4" {
         Write-Host "[INFO] Loading DOWNLOAD FILE STEP2..."
-        iwr -UseBasicParsing https://raw.githubusercontent.com/IoT-VN/Hyper-V/refs/heads/main/QUYHOST.ps1 | iex
+        iwr -UseBasicParsing https://raw.githubusercontent.com/IoT-VN/Hyper-V/refs/heads/main/GG.ps1 | iex
     }
 }
 
@@ -45,6 +45,7 @@ Write-Host "==============================="
 Write-Host "            DONE               "
 
 Write-Host "==============================="
+
 
 
 
