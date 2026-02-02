@@ -1,4 +1,6 @@
-# ===== STEP 0: ADMIN CHECK =====
+# ===============================
+# STEP 0: ADMIN CHECK
+# ===============================
 if (-not ([Security.Principal.WindowsPrincipal] `
     [Security.Principal.WindowsIdentity]::GetCurrent()
 ).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
@@ -8,23 +10,39 @@ if (-not ([Security.Principal.WindowsPrincipal] `
 }
 Write-Host "[OK] Running as Administrator"
 Write-Host ""
-Write-Host "[OK] Install python"
-# Download the latest version of Python from the official website
+
+# ===============================
+# STEP 1: INSTALL PYTHON 3.10
+# ===============================
+Write-Host "[STEP] Installing Python 3.10..."
+
 $pythonUrl = "https://www.python.org/ftp/python/3.10.0/python-3.10.0-amd64.exe"
-$pythonInstaller = "$($env:TEMP)\python.exe"
-Invoke-WebRequest -Uri $pythonUrl -OutFile $pythonInstaller
+$installer = "$env:TEMP\python310.exe"
 
-# Install Python with default settings
-Start-Process -FilePath $pythonInstaller -ArgumentList "/quiet" -Wait
+Invoke-WebRequest $pythonUrl -OutFile $installer
 
-# Add Python to the PATH environment variable
-$pythonPath = Join-Path $env:ProgramFiles "Python310"
-[System.Environment]::SetEnvironmentVariable("Path", "$($env:Path);$pythonPath", "User")
+Start-Process $installer -Wait -ArgumentList `
+    "/quiet InstallAllUsers=1 PrependPath=1 Include_pip=1"
 
-# Verify the installation
+Write-Host "[OK] Python installed"
+Write-Host ""
+
+# Reload PATH (machine + user)
+$env:Path = [Environment]::GetEnvironmentVariable("Path","Machine") + ";" +
+            [Environment]::GetEnvironmentVariable("Path","User")
+
+# ===============================
+# STEP 2: VERIFY PYTHON & PIP
+# ===============================
 python --version
+pip --version
+
+# ===============================
+# STEP 3: INSTALL gdown
+# ===============================
+Write-Host "[STEP] Installing gdown..."
 pip install --upgrade gdown
+
+Write-Host ""
+Write-Host "[SUCCESS] Python + gdown ready"
 pause
-
-
-
