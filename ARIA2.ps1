@@ -17,12 +17,25 @@ if (-not ([Security.Principal.WindowsPrincipal] `
 Write-Host "[OK] Running as Administrator"
 Write-Host ""
 
+Write-Host "[CHECK] Hyper-V status..."
 
 $hv = Get-WindowsOptionalFeature -Online -FeatureName Microsoft-Hyper-V-All
 
 if ($hv.State -ne "Enabled") {
-    Write-Host "[INFO] Hyper-V not enabled"
-} else {
+    Write-Host "[INFO] Hyper-V not enabled. Enabling now..." -ForegroundColor Yellow
+
+    Enable-WindowsOptionalFeature `
+        -Online `
+        -FeatureName Microsoft-Hyper-V-All `
+        -All `
+        -NoRestart
+
+    Write-Host "[INFO] Hyper-V enabled. System will reboot now..." -ForegroundColor Cyan
+    Start-Sleep -Seconds 3
+    Restart-Computer -Force
+    exit
+}
+else {
     Write-Host "[OK] Hyper-V already enabled"
 }
 
@@ -122,4 +135,5 @@ if ($needDownload) {
 Write-Host ""
 Write-Host "[SUCCESS] DONE"
 pause
+
 
