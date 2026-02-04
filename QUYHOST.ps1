@@ -172,38 +172,36 @@ Write-Host "Path: $TargetRoot"
 
 #Start-Process explorer.exe $TargetRoot
 
-# ===== STEP 9: COPY DRIVER TO VM (CORRECT STRUCTURE) =====
+# ===== STEP 9: COPY DRIVER TO VM (USING Copy-VMFile) =====
 Write-Host ""
-Write-Host "[STEP] Copy GPU driver into VM (System32 + DriverStore)"
+Write-Host "[STEP] Copy GPU driver into VM (Copy-VMFile)"
 
 $VmDriverStore = "C:\Windows\System32\DriverStore\FileRepository"
 $VmSystem32    = "C:\Windows\System32"
 
-# --- Ensure DriverStore\FileRepository exists in VM ---
-Invoke-Command -VMName $vm -ScriptBlock {
-    param($Path)
-    if (!(Test-Path $Path)) {
-        New-Item -ItemType Directory -Path $Path -Force | Out-Null
-    }
-} -ArgumentList $VmDriverStore
-
 # --- Copy DriverStore INF folder ---
 Write-Host "[INFO] Copying DriverStore INF folder..."
-Copy-Item `
-    -Path "$TargetRoot\$InfFolderName" `
-    -Destination "\\$vm\C$\Windows\System32\DriverStore\FileRepository\$InfFolderName" `
-    -Recurse -Force
 
-# --- Copy nvapi64.dll to System32 ---
+Copy-VMFile `
+    -Name $vm `
+    -SourcePath "$TargetRoot\$InfFolderName" `
+    -DestinationPath "$VmDriverStore\$InfFolderName" `
+    -CreateFullPath `
+    -FileSource Host
+
+# --- Copy nvapi64.dll ---
 if (Test-Path "$TargetRoot\nvapi64.dll") {
-    Write-Host "[INFO] Copying nvapi64.dll to System32..."
-    Copy-Item `
-        -Path "$TargetRoot\nvapi64.dll" `
-        -Destination "\\$vm\C$\Windows\System32\nvapi64.dll" `
-        -Force
+    Write-Host "[INFO] Copying nvapi64.dll..."
+    Copy-VMFile `
+        -Name $vm `
+        -SourcePath "$TargetRoot\nvapi64.dll" `
+        -DestinationPath "$VmSystem32\nvapi64.dll" `
+        -CreateFullPath `
+        -FileSource Host
 }
 
-Write-Host "[OK] Driver copied to correct VM locations"
+Write-Host "[OK] Driver copied to VM via Copy-VMFile"
+
 # ===== STEP 10: RESTART VM =====
 Write-Host ""
 Write-Host "[STEP] Restarting VM"
@@ -217,6 +215,7 @@ while ((Get-VM -Name $vm).State -ne "Running") {
 
 Write-Host "[OK] VM restarted successfully"
 pause
+
 
 
 
