@@ -172,49 +172,73 @@ Write-Host "Path: $TargetRoot"
 
 #Start-Process explorer.exe $TargetRoot
 
-# ===== STEP 9: COPY DRIVER TO VM (USING Copy-VMFile) =====
+# ===== STEP 9: COPY DRIVER TO VM TEMP (Copy-VMFile) =====
 Write-Host ""
-Write-Host "[STEP] Copy GPU driver into VM (Copy-VMFile)"
+Write-Host "[STEP] Copy GPU driver into VM TEMP"
 
-$VmDriverStore = "C:\Windows\System32\HostDriverStore\FileRepository"
-$VmSystem32    = "C:\Windows\System32"
+$VmTemp = "C:\Temp\GPU"
 
-# --- Copy DriverStore INF folder ---
-Write-Host "[INFO] Copying DriverStore INF folder..."
+# --- Copy INF folder to TEMP ---
+Write-Host "[INFO] Copying INF folder to VM TEMP..."
 
 Copy-VMFile `
     -Name $vm `
     -SourcePath "$TargetRoot\$InfFolderName" `
-    -DestinationPath "$VmDriverStore\$InfFolderName" `
+    -DestinationPath "$VmTemp\$InfFolderName" `
     -CreateFullPath `
     -FileSource Host
 
-# --- Copy nvapi64.dll ---
+# --- Copy nvapi64.dll to TEMP ---
 if (Test-Path "$TargetRoot\nvapi64.dll") {
-    Write-Host "[INFO] Copying nvapi64.dll..."
+    Write-Host "[INFO] Copying nvapi64.dll to VM TEMP..."
+
     Copy-VMFile `
         -Name $vm `
         -SourcePath "$TargetRoot\nvapi64.dll" `
-        -DestinationPath "$VmSystem32\nvapi64.dll" `
+        -DestinationPath "$VmTemp\nvapi64.dll" `
         -CreateFullPath `
         -FileSource Host
 }
 
-Write-Host "[OK] Driver copied to VM via Copy-VMFile"
+Write-Host "[OK] Driver copied to VM TEMP"
 
-# ===== STEP 10: RESTART VM =====
+# ===== STEP 10: APPLY DRIVER INSIDE VM =====
 Write-Host ""
-Write-Host "[STEP] Restarting VM"
+Write-Host "[STEP] Apply GPU driver inside VM"
 
-Restart-VM -Name $vm -Force
+Invoke-Command -VMName $vm -Credential $cred -ScriptBlock {
+    $InfFolderName = $using:InfFolderName
 
-while ((Get-VM -Name $vm).State -ne "Running") {
-    Write-Host "[INFO] Waiting VM to restart..."
-    Start-Sleep 2
+    $TempRoot = "C:\Temp\GPU"
+    $HostDriverStore = "C:\Windows\System32\HostDriverStore"
+    $HostRepo        = "$HostDriverStore\FileRepository"
+    $Sys32           = "C:\Windows\System32"
+
+    # Ensure folders exist
+    if (!(Test-Path $HostRepo)) {
+        New-Item -ItemType Directory -Path $HostRepo -Force | Out-Null
+    }
+
+    # Copy INF folder
+    Copy-Item `
+        -Path "$TempRoot\$InfFolderName" `
+        -Destination "$HostRepo\$InfFolderName" `
+        -Recurse -Force
+
+    # Copy nvapi64.dll
+    Copy-Item `
+        -Path "$TempRoot\nvapi64.dll" `
+        -Destination "$Sys32\nvapi64.dll" `
+        -Force
 }
 
-Write-Host "[OK] VM restarted successfully"
+Write-Host "[OK] Driver applied inside VM"
+Write-Host ""
+Write-Host "[STEP] Restarting VM"
+Restart-VM -Name $vm -Force
+
 pause
+
 
 
 
