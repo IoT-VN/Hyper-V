@@ -14,6 +14,8 @@ New-Item HKLM:\SOFTWARE\Policies\Microsoft\Windows\LanmanWorkstation -Force | Ou
 Set-ItemProperty HKLM:\SOFTWARE\Policies\Microsoft\Windows\LanmanWorkstation AllowInsecureGuestAuth 1
 # 3. Create user
 net user liza 1 /add
+Start-Service vmicguestinterface
+Set-Service vmicguestinterface -StartupType Automatic
 
 # ===============================
 # STEP 3: CREATE DRIVER SHORTCUT
