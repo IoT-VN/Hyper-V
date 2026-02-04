@@ -153,22 +153,14 @@ if (!(Test-Path $DestInf)) {
 }
 
 # ===== COPY REQUIRED DLL (nvapi64.dll example) =====
-# NOTE: lấy DLL từ DriverFiles cho đúng GPU, không hardcode
-foreach ($d in $Drivers) {
-    $ModifiedDeviceID = $d.DeviceID -replace "\\", "\\"
-    $Antecedent = "\\" + $hostname + "\ROOT\cimv2:Win32_PNPSignedDriver.DeviceID=""$ModifiedDeviceID"""
+# ===== COPY nvapi64.dll (FIXED LOCATION) =====
+$nvapi64 = "$env:WINDIR\System32\nvapi64.dll"
 
-    Get-WmiObject Win32_PNPSignedDriverCIMDataFile |
-        Where-Object { $_.Antecedent -eq $Antecedent } |
-        ForEach-Object {
-            $path = $_.Dependent.Split("=")[1] -replace '\\\\','\'
-            $path2 = $path.Substring(1,$path.Length-2)
-
-            if ($path2 -match "nvapi64\.dll$") {
-                Copy-Item $path2 -Destination $TargetRoot -Force
-                Write-Host "[OK] Copied nvapi64.dll"
-            }
-        }
+if (Test-Path $nvapi64) {
+    Copy-Item $nvapi64 -Destination $TargetRoot -Force
+    Write-Host "[OK] Copied nvapi64.dll"
+} else {
+    Write-Host "[WARN] nvapi64.dll not found" -ForegroundColor Yellow
 }
 
 # ===== DONE =====
@@ -179,14 +171,6 @@ Write-Host "==============================="
 Write-Host "Path: $TargetRoot"
 
 Start-Process explorer.exe $TargetRoot
-
-
-Start-Process explorer.exe "C:\DRIVER_GPU_COPY"
-
-
-Write-Host ""
-Write-Host "==============================="
-Write-Host "[SUCCESS] ALL DONE" -ForegroundColor Green
-Write-Host "==============================="
 pause
+
 
