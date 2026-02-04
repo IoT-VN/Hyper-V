@@ -172,36 +172,45 @@ Write-Host "Path: $TargetRoot"
 
 #Start-Process explorer.exe $TargetRoot
 
-# ===== STEP 9: COPY DRIVER TO VM TEMP (Copy-VMFile) =====
+# ===== STEP 9A: ZIP INF FOLDER (HOST) =====
+$ZipInf = "$TargetRoot\$InfFolderName.zip"
+
+if (Test-Path $ZipInf) {
+    Remove-Item $ZipInf -Force
+}
+
+Compress-Archive `
+    -Path "$TargetRoot\$InfFolderName\*" `
+    -DestinationPath $ZipInf
+
+# ===== STEP 9B: COPY FILES TO VM TEMP =====
 Write-Host ""
-Write-Host "[STEP] Copy GPU driver into VM TEMP"
+Write-Host "[STEP] Copy GPU driver files into VM TEMP"
 
 $VmTemp = "C:\Temp\GPU"
 
-# --- Copy INF folder to TEMP ---
-Write-Host "[INFO] Copying INF folder to VM TEMP..."
-
+# Copy ZIP
 Copy-VMFile `
     -Name $vm `
-    -SourcePath "$TargetRoot\$InfFolderName" `
-    -DestinationPath "$VmTemp\$InfFolderName" `
+    -SourcePath "$TargetRoot\$InfFolderName.zip" `
+    -DestinationPath "$VmTemp\$InfFolderName.zip" `
     -CreateFullPath `
     -FileSource Host
 
-# --- Copy nvapi64.dll to TEMP ---
-if (Test-Path "$TargetRoot\nvapi64.dll") {
-    Write-Host "[INFO] Copying nvapi64.dll to VM TEMP..."
+# Copy nvapi64.dll
+Copy-VMFile `
+    -Name $vm `
+    -SourcePath "$TargetRoot\nvapi64.dll" `
+    -DestinationPath "$VmTemp\nvapi64.dll" `
+    -CreateFullPath `
+    -FileSource Host
 
-    Copy-VMFile `
-        -Name $vm `
-        -SourcePath "$TargetRoot\nvapi64.dll" `
-        -DestinationPath "$VmTemp\nvapi64.dll" `
-        -CreateFullPath `
-        -FileSource Host
-}
+Write-Host "[OK] Files copied to VM TEMP"
 
-Write-Host "[OK] Driver copied to VM TEMP"
-
+$cred = New-Object System.Management.Automation.PSCredential(
+    "Administrator",
+    (ConvertTo-SecureString "123" -AsPlainText -Force)
+)
 # ===== STEP 10: APPLY DRIVER INSIDE VM =====
 Write-Host ""
 Write-Host "[STEP] Apply GPU driver inside VM"
@@ -211,10 +220,21 @@ Invoke-Command -VMName $vm -Credential $cred -ScriptBlock {
 
     $TempRoot = "C:\Temp\GPU"
     $HostDriverStore = "C:\Windows\System32\HostDriverStore"
-    $HostRepo        = "$HostDriverStore\FileRepository"
-    $Sys32           = "C:\Windows\System32"
+    $HostRepo = "$HostDriverStore\FileRepository"
+    $Sys32 = "C:\Windows\System32"
 
-    # Ensure folders exist
+    # Cleanup old temp
+    if (Test-Path $TempRoot) {
+        Remove-Item $TempRoot -Recurse -Force
+    }
+    New-Item -ItemType Directory -Path $TempRoot | Out-Null
+
+    # Extract INF
+    Expand-Archive `
+        -Path "$TempRoot\$InfFolderName.zip" `
+        -DestinationPath "$TempRoot\$InfFolderName"
+
+    # Ensure HostDriverStore exists
     if (!(Test-Path $HostRepo)) {
         New-Item -ItemType Directory -Path $HostRepo -Force | Out-Null
     }
@@ -233,11 +253,13 @@ Invoke-Command -VMName $vm -Credential $cred -ScriptBlock {
 }
 
 Write-Host "[OK] Driver applied inside VM"
-Write-Host ""
+
+
 Write-Host "[STEP] Restarting VM"
 Restart-VM -Name $vm -Force
 
 pause
+
 
 
 
