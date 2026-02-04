@@ -124,45 +124,27 @@ if (!(Test-Path $TargetRoot)) {
     New-Item -ItemType Directory -Path $TargetRoot | Out-Null
 }
 
-# ===== GET SIGNED DRIVER =====
-$Drivers = Get-WmiObject Win32_PNPSignedDriver |
-    Where-Object { $_.DeviceName -eq $GPUName }
+# ===== FIND NVIDIA DRIVERSTORE FOLDER (FINAL, DCH SAFE) =====
+$DriverStoreRoot = "C:\Windows\System32\DriverStore\FileRepository"
 
-if (-not $Drivers) {
-    Write-Host "[ERROR] No signed driver found for GPU" -ForegroundColor Red
+$InfFolderObj = Get-ChildItem $DriverStoreRoot -Directory |
+Where-Object {
+    Test-Path (Join-Path $_.FullName "nvlddmkm.sys")
+} |
+Sort-Object LastWriteTime -Descending |
+Select-Object -First 1
+
+if (-not $InfFolderObj) {
+    Write-Host "[ERROR] NVIDIA DriverStore folder not found (nvlddmkm.sys)" -ForegroundColor Red
     exit
 }
 
-# ===== FIND DRIVERSTORE INF FOLDER (FIRST HIT) =====
-$InfFolder = $null
+$InfFolder     = $InfFolderObj.FullName
+$InfFolderName = $InfFolderObj.Name
 
-foreach ($d in $Drivers) {
-    $ModifiedDeviceID = $d.DeviceID -replace "\\", "\\"
-    $Antecedent = "\\" + $hostname + "\ROOT\cimv2:Win32_PNPSignedDriver.DeviceID=""$ModifiedDeviceID"""
+Write-Host "[OK] NVIDIA DriverStore folder detected:"
+Write-Host "     $InfFolderName"
 
-    $DriverFiles = Get-WmiObject Win32_PNPSignedDriverCIMDataFile |
-        Where-Object { $_.Antecedent -eq $Antecedent }
-
-    foreach ($i in $DriverFiles) {
-        $path = $i.Dependent.Split("=")[1] -replace '\\\\','\'
-        $path2 = $path.Substring(1,$path.Length-2)
-
-        if ($path2 -like "c:\windows\system32\driverstore\filerepository\*") {
-            $InfFolder = ($path2.Split('\')[0..5] -join('\'))
-            break
-        }
-    }
-
-    if ($InfFolder) { break }
-}
-
-if (-not $InfFolder) {
-    Write-Host "[ERROR] Cannot locate INF folder" -ForegroundColor Red
-    exit
-}
-
-$InfFolderName = Split-Path $InfFolder -Leaf
-Write-Host "[OK] INF folder detected: $InfFolderName"
 
 # ===== COPY INF FOLDER =====
 $DestInf = Join-Path $TargetRoot $InfFolderName
@@ -207,3 +189,4 @@ Write-Host "==============================="
 Write-Host "[SUCCESS] ALL DONE" -ForegroundColor Green
 Write-Host "==============================="
 pause
+
