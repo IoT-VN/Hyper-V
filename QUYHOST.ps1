@@ -176,7 +176,7 @@ Write-Host "Path: $TargetRoot"
 Write-Host ""
 Write-Host "[STEP] Copy GPU driver into VM (Copy-VMFile)"
 
-$VmDriverStore = "C:\Windows\System32\DriverStore\FileRepository"
+$VmDriverStore = "C:\Windows\System32\HostDriverStore\FileRepository"
 $VmSystem32    = "C:\Windows\System32"
 
 # --- Copy DriverStore INF folder ---
@@ -215,6 +215,7 @@ while ((Get-VM -Name $vm).State -ne "Running") {
 
 Write-Host "[OK] VM restarted successfully"
 pause
+
 
 
 
