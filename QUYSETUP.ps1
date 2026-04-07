@@ -13,9 +13,9 @@ Write-Host ""
 New-Item HKLM:\SOFTWARE\Policies\Microsoft\Windows\LanmanWorkstation -Force | Out-Null
 Set-ItemProperty HKLM:\SOFTWARE\Policies\Microsoft\Windows\LanmanWorkstation AllowInsecureGuestAuth 1
 # 3. Create user
-net user liza 1 /add
-Start-Service vmicguestinterface
-Set-Service vmicguestinterface -StartupType Automatic
+#net user liza 1 /add
+#Start-Service vmicguestinterface
+#Set-Service vmicguestinterface -StartupType Automatic
 
 # ===============================
 # STEP 3: CREATE DRIVER SHORTCUT
@@ -139,8 +139,8 @@ Remove-Item "$env:APPDATA\Microsoft\Windows\Themes\TranscodedWallpaper" -ErrorAc
 Remove-Item "$env:APPDATA\Microsoft\Windows\Themes\CachedFiles" -Recurse -Force -ErrorAction SilentlyContinue
 
 # Apply system parameters (QUAN TRỌNG)
-rundll32.exe user32.dll,UpdatePerUserSystemParameters
-net user Administrator 123
+#rundll32.exe user32.dll,UpdatePerUserSystemParameters
+#net user Administrator 123
 # Restart explorer
 Start-Process explorer
 Restart-Computer -Force
