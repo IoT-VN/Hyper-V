@@ -169,7 +169,7 @@ Write-Host "==============================="
 Write-Host "[SUCCESS] GPU DRIVER READY" -ForegroundColor Green
 Write-Host "==============================="
 Write-Host "Path: $TargetRoot"
-
+exit
 #Start-Process explorer.exe $TargetRoot
 
 # ===== STEP 9A: ZIP INF FOLDER (HOST) =====
